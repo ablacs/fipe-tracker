@@ -1,78 +1,84 @@
 import streamlit as st
+import json
+from pathlib import Path
+import plotly.graph_objects as go
 import fipe_api as api
 import data_processing as dp
-import charts
 
 st.set_page_config(page_title="FIPE Tracker", page_icon="📉", layout="wide")
-st.title("📉 FIPE Tracker — Histórico de Depreciação")
+
 
 with st.sidebar:
-    st.header("🔍 Selecionar Veículo")
+    st.markdown("## 📉 FIPE Tracker")
+    st.caption("Selecione uma página acima")
 
-    brands = api.get_brands()
-    brand_names = [b["nome"] for b in brands]
-    selected_brand_name = st.selectbox("Marca", brand_names)
-    selected_brand = next(b for b in brands if b["nome"] == selected_brand_name)
+st.title("📉 FIPE Tracker")
+st.caption("Acompanhamento histórico de depreciação — Tabela FIPE")
 
-    models = api.get_models(selected_brand["codigo"])
-    model_names = [m["nome"] for m in models]
-    selected_model_name = st.selectbox("Modelo", model_names)
-    selected_model = next(m for m in models if m["nome"] == selected_model_name)
+TRACKED_FILE = Path("tracked_vehicles.json")
 
-    years = api.get_years(selected_brand["codigo"], selected_model["codigo"])
-    year_names = [y["nome"] for y in years]
-    selected_year_name = st.selectbox("Ano/Combustível", year_names)
-    selected_year = next(y for y in years if y["nome"] == selected_year_name)
+if not TRACKED_FILE.exists():
+    st.info("Nenhum veículo rastreado ainda. Acesse **Detalhes** na barra lateral para adicionar o primeiro.")
+    st.stop()
 
-    if st.button("💾 Registrar preço atual"):
-        price_data = api.get_price(
-            selected_brand["codigo"],
-            selected_model["codigo"],
-            selected_year["codigo"]
-        )
-        dp.save_price(
-            selected_brand_name,
-            selected_model_name,
-            selected_year_name,
-            price_data["Valor"]
-        )
-        added = dp.track_vehicle(
-            selected_brand["codigo"], selected_brand_name,
-            selected_model["codigo"], selected_model_name,
-            selected_year["codigo"], selected_year_name,
-        )
-        st.success(f"Salvo: {price_data['Valor']}")
-        if added:
-            st.info("✅ Veículo adicionado ao rastreamento mensal automático.")
+with open(TRACKED_FILE) as f:
+    vehicles = json.load(f)
 
-price_data = api.get_price(
-    selected_brand["codigo"],
-    selected_model["codigo"],
-    selected_year["codigo"]
-)
+if not vehicles:
+    st.info("Nenhum veículo rastreado ainda. Acesse **Detalhes** na barra lateral para adicionar o primeiro.")
+    st.stop()
 
-col1, col2 = st.columns(2)
-col1.metric("💰 Preço atual (FIPE)", price_data["Valor"])
-col2.metric("📅 Referência", price_data.get("MesReferencia", "—"))
-
+n = len(vehicles)
+st.subheader(f"🚗 {n} veículo{'s' if n > 1 else ''} rastreado{'s' if n > 1 else ''}")
 st.divider()
 
-df = dp.load_history(selected_brand_name, selected_model_name, selected_year_name)
-vehicle_label = f"{selected_brand_name} {selected_model_name} ({selected_year_name})"
+cols = st.columns(3)
 
-if df.empty:
-    st.info("Nenhum histórico ainda. Clique em **Registrar preço atual** para começar a construir o histórico.")
-else:
-    tab1, tab2, tab3 = st.tabs(["Evolução de Preço", "Depreciação", "Tabela"])
+for i, v in enumerate(vehicles):
+    with cols[i % 3]:
+        with st.container(border=True):
+            st.markdown(f"#### {v['brand_name']} {v['model_name']}")
+            st.caption(v['year_name'])
 
-    with tab1:
-        st.plotly_chart(charts.price_evolution_chart(df, vehicle_label), width='stretch')
+            try:
+                price_data = api.get_price(
+                    str(v['brand_code']),
+                    str(v['model_code']),
+                    str(v['year_code'])
+                )
+                current_price = price_data['Valor']
+            except Exception:
+                current_price = "Indisponível"
 
-    with tab2:
-        st.plotly_chart(charts.depreciation_chart(df, vehicle_label), width='stretch')
+            df = dp.load_history(v['brand_name'], v['model_name'], v['year_name'])
 
-    with tab3:
-        st.dataframe(
-            df[["data_coleta", "preco", "variacao_mensal", "depreciacao_pct"]],
-            width='stretch'
-        )
+            if not df.empty and len(df) >= 2:
+                delta_pct = df['depreciacao_pct'].iloc[-1]
+                st.metric(
+                    "Preço FIPE",
+                    current_price,
+                    delta=f"{delta_pct:+.1f}% acumulado",
+                    delta_color="inverse"
+                )
+
+                fig = go.Figure(go.Scatter(
+                    x=df['data_coleta'],
+                    y=df['preco'],
+                    mode='lines+markers',
+                    line=dict(color='#2563EB', width=2),
+                    fill='tozeroy',
+                    fillcolor='rgba(37,99,235,0.1)'
+                ))
+                fig.update_layout(
+                    height=100,
+                    margin=dict(l=0, r=0, t=4, b=0),
+                    xaxis=dict(visible=False),
+                    yaxis=dict(visible=False),
+                    paper_bgcolor='rgba(0,0,0,0)',
+                    plot_bgcolor='rgba(0,0,0,0)',
+                    showlegend=False,
+                )
+                st.plotly_chart(fig, width='stretch', key=f"spark_{i}")
+            else:
+                st.metric("Preço FIPE", current_price)
+                st.caption("📊 Registre ao menos 2 meses para ver o gráfico")
