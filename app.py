@@ -6,7 +6,6 @@ import charts
 st.set_page_config(page_title="FIPE Tracker", page_icon="📉", layout="wide")
 st.title("📉 FIPE Tracker — Histórico de Depreciação")
 
-# ── Sidebar: seleção do veículo ──────────────────────────────────────────────
 with st.sidebar:
     st.header("🔍 Selecionar Veículo")
 
@@ -37,9 +36,15 @@ with st.sidebar:
             selected_year_name,
             price_data["Valor"]
         )
+        added = dp.track_vehicle(
+            selected_brand["codigo"], selected_brand_name,
+            selected_model["codigo"], selected_model_name,
+            selected_year["codigo"], selected_year_name,
+        )
         st.success(f"Salvo: {price_data['Valor']}")
+        if added:
+            st.info("✅ Veículo adicionado ao rastreamento mensal automático.")
 
-# ── Painel principal ─────────────────────────────────────────────────────────
 price_data = api.get_price(
     selected_brand["codigo"],
     selected_model["codigo"],
@@ -61,13 +66,13 @@ else:
     tab1, tab2, tab3 = st.tabs(["Evolução de Preço", "Depreciação", "Tabela"])
 
     with tab1:
-        st.plotly_chart(charts.price_evolution_chart(df, vehicle_label), width="stretch")
+        st.plotly_chart(charts.price_evolution_chart(df, vehicle_label), width='stretch')
 
     with tab2:
-        st.plotly_chart(charts.depreciation_chart(df, vehicle_label), width="stretch")
+        st.plotly_chart(charts.depreciation_chart(df, vehicle_label), width='stretch')
 
     with tab3:
         st.dataframe(
             df[["data_coleta", "preco", "variacao_mensal", "depreciacao_pct"]],
-            width="stretch"
+            width='stretch'
         )

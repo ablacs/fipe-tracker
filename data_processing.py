@@ -1,17 +1,17 @@
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+import json
 import re
 
 HISTORY_FILE = Path("historico.csv")
+TRACKED_FILE = Path("tracked_vehicles.json")
 
 def parse_price(value_str: str) -> float:
-    """Converte 'R$ 85.000,00' → 85000.0"""
     cleaned = re.sub(r"[R$\s.]", "", value_str).replace(",", ".")
     return float(cleaned)
 
 def save_price(brand: str, model: str, year: str, value_str: str) -> None:
-    """Adiciona uma linha ao CSV histórico."""
     price = parse_price(value_str)
     row = {
         "data_coleta": datetime.today().strftime("%Y-%m"),
@@ -25,15 +25,45 @@ def save_price(brand: str, model: str, year: str, value_str: str) -> None:
     if HISTORY_FILE.exists():
         df_existing = pd.read_csv(HISTORY_FILE)
         df = pd.concat([df_existing, df_new], ignore_index=True)
-        # Evita duplicatas da mesma coleta mensal
         df = df.drop_duplicates(subset=["data_coleta", "marca", "modelo", "ano"], keep="last")
     else:
         df = df_new
 
     df.to_csv(HISTORY_FILE, index=False)
 
+def track_vehicle(
+    brand_code: str, brand_name: str,
+    model_code: str, model_name: str,
+    year_code: str, year_name: str
+) -> bool:
+    """Adiciona veículo ao JSON de rastreamento. Retorna True se adicionou, False se já existia."""
+    vehicle = {
+        "brand_code": brand_code, "brand_name": brand_name,
+        "model_code": model_code, "model_name": model_name,
+        "year_code": year_code,   "year_name": year_name,
+    }
+
+    vehicles = []
+    if TRACKED_FILE.exists():
+        with open(TRACKED_FILE) as f:
+            vehicles = json.load(f)
+
+    already_tracked = any(
+        v["brand_code"] == brand_code and
+        v["model_code"] == model_code and
+        v["year_code"] == year_code
+        for v in vehicles
+    )
+
+    if not already_tracked:
+        vehicles.append(vehicle)
+        with open(TRACKED_FILE, "w") as f:
+            json.dump(vehicles, f, ensure_ascii=False, indent=2)
+        return True
+
+    return False
+
 def load_history(brand: str, model: str, year: str) -> pd.DataFrame:
-    """Carrega histórico filtrado por veículo."""
     if not HISTORY_FILE.exists():
         return pd.DataFrame()
 
