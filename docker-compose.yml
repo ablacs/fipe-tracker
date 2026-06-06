@@ -1,0 +1,9 @@
+services:
+  fipe-tracker:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./historico.csv:/app/historico.csv
+      - ./tracked_vehicles.json:/app/tracked_vehicles.json
+    restart: unless-stopped
