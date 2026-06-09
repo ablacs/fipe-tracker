@@ -5,6 +5,7 @@ import json
 import re
 import io
 
+import numpy as np
 
 HISTORY_FILE = Path("historico.csv")
 TRACKED_FILE = Path("tracked_vehicles.json")
@@ -106,3 +107,59 @@ def to_excel(df: pd.DataFrame) -> bytes:
             ws.column_dimensions[col[0].column_letter].width = max_len + 4
 
     return buffer.getvalue()
+
+
+def calculate_trend(df: pd.DataFrame) -> dict | None:
+    """
+    Regressão linear sobre o histórico de preços.
+    Retorna projeção para 3 meses e recomendação de compra.
+    Requer ao menos 2 pontos de histórico.
+    """
+    if len(df) < 2:
+        return None
+
+    x = np.arange(len(df))
+    y = df["preco"].values
+    slope, intercept = np.polyfit(x, y, 1)
+
+    # Gera os próximos 3 meses como strings "YYYY-MM"
+    last = df["data_coleta"].iloc[-1]
+    year, month = map(int, last.split("-"))
+    future_months = []
+    for i in range(1, 4):
+        m = month + i
+        y_adj = year + (m - 1) // 12
+        m_adj = ((m - 1) % 12) + 1
+        future_months.append(f"{y_adj}-{m_adj:02d}")
+
+    future_x = np.arange(len(df), len(df) + 3)
+    future_prices = (slope * future_x + intercept).tolist()
+
+    # Slope como % do preço atual por mês
+    slope_pct = (slope / df["preco"].iloc[-1]) * 100
+
+    if slope_pct < -2:
+        signal      = "queda_forte"
+        icon        = "⬇️"
+        recommendation = "Preço em queda acentuada — considere esperar para comprar"
+    elif slope_pct < -0.5:
+        signal      = "queda_leve"
+        icon        = "📉"
+        recommendation = "Preço em leve queda — bom momento para negociar"
+    elif slope_pct < 0.5:
+        signal      = "estavel"
+        icon        = "➡️"
+        recommendation = "Preço estável — momento neutro para compra"
+    else:
+        signal      = "alta"
+        icon        = "📈"
+        recommendation = "Preço em alta — compre agora se quiser garantir o valor"
+
+    return {
+        "slope_pct":     round(slope_pct, 2),
+        "future_months": future_months,
+        "future_prices": [round(p, 2) for p in future_prices],
+        "signal":        signal,
+        "icon":          icon,
+        "recommendation": recommendation,
+    }

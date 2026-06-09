@@ -44,3 +44,40 @@ def comparison_chart(df1: pd.DataFrame, label1: str, df2: pd.DataFrame, label2: 
     )
     fig.update_xaxes(type="category")
     return fig
+
+def price_with_projection_chart(
+    df: pd.DataFrame,
+    future_months: list,
+    future_prices: list,
+    title: str
+) -> go.Figure:
+    """Gráfico de preço histórico + linha de projeção tracejada."""
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df["data_coleta"],
+        y=df["preco"],
+        mode="lines+markers",
+        name="Histórico",
+        line=dict(color="#2563EB", width=2)
+    ))
+
+    x_proj = [df["data_coleta"].iloc[-1]] + future_months
+    y_proj = [df["preco"].iloc[-1]] + future_prices
+
+    fig.add_trace(go.Scatter(
+        x=x_proj,
+        y=y_proj,
+        mode="lines+markers",
+        name="Projeção (3 meses)",
+        line=dict(color="#DC2626", width=2, dash="dash"),
+        marker=dict(symbol="circle-open", size=8)
+    ))
+
+    fig.update_layout(
+        title=title,
+        xaxis_title="Mês",
+        yaxis_title="Preço (R$)"
+    )
+    fig.update_xaxes(type="category")
+    return fig
