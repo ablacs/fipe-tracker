@@ -1,6 +1,4 @@
 import streamlit as st
-import json
-from pathlib import Path
 import plotly.graph_objects as go
 import fipe_api as api
 import data_processing as dp
@@ -8,17 +6,12 @@ import data_processing as dp
 st.title("📉 FIPE Tracker")
 st.caption("Acompanhamento histórico de depreciação — Tabela FIPE")
 
-TRACKED_FILE = Path("tracked_vehicles.json")
 
-if not TRACKED_FILE.exists():
-    st.info("Nenhum veículo rastreado ainda. Acesse **Registrar** na barra lateral para adicionar o primeiro.")
-    st.stop()
 
-with open(TRACKED_FILE) as f:
-    vehicles = json.load(f)
+vehicles = dp.get_tracked_vehicles()
 
 if not vehicles:
-    st.info("Nenhum veículo rastreado ainda. Acesse **Registrar** na barra lateral para adicionar o primeiro.")
+    st.info("Nenhum veículo rastreado ainda. Acesse **Adicionar** na barra lateral para adicionar o primeiro.")
     st.stop()
 
 n = len(vehicles)

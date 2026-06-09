@@ -1,90 +1,105 @@
 import pandas as pd
-from pathlib import Path
 from datetime import datetime
 import json
 import re
 import io
-
+import os
 import numpy as np
+from pathlib import Path
+from dotenv import load_dotenv
+from supabase import create_client, Client
 
-HISTORY_FILE = Path("historico.csv")
-TRACKED_FILE = Path("tracked_vehicles.json")
+load_dotenv()
+
+def get_supabase() -> Client:
+    url = os.environ.get("SUPABASE_URL")
+    key = os.environ.get("SUPABASE_KEY")
+    if not url or not key:
+        raise ValueError("SUPABASE_URL e SUPABASE_KEY não configurados.")
+    return create_client(url, key)
+
 
 def parse_price(value_str: str) -> float:
     cleaned = re.sub(r"[R$\s.]", "", value_str).replace(",", ".")
     return float(cleaned)
 
+
 def save_price(brand: str, model: str, year: str, value_str: str) -> None:
-    price = parse_price(value_str)
+    """Salva ou atualiza o preço do mês atual no Supabase."""
+    supabase = get_supabase()
+    preco = parse_price(value_str)
     row = {
         "data_coleta": datetime.today().strftime("%Y-%m"),
-        "marca": brand,
+        "marca":  brand,
         "modelo": model,
-        "ano": year,
-        "preco": price,
+        "ano":    year,
+        "preco":  preco,
     }
-    df_new = pd.DataFrame([row])
+    supabase.table("historico").upsert(
+        row,
+        on_conflict="data_coleta,marca,modelo,ano"
+    ).execute()
 
-    if HISTORY_FILE.exists():
-        df_existing = pd.read_csv(HISTORY_FILE)
-        df = pd.concat([df_existing, df_new], ignore_index=True)
-        df = df.drop_duplicates(subset=["data_coleta", "marca", "modelo", "ano"], keep="last")
-    else:
-        df = df_new
-
-    df.to_csv(HISTORY_FILE, index=False)
 
 def track_vehicle(
     brand_code: str, brand_name: str,
     model_code: str, model_name: str,
-    year_code: str, year_name: str
+    year_code:  str, year_name:  str
 ) -> bool:
-    """Adiciona veículo ao JSON de rastreamento. Retorna True se adicionou, False se já existia."""
-    vehicle = {
-        "brand_code": brand_code, "brand_name": brand_name,
-        "model_code": model_code, "model_name": model_name,
-        "year_code": year_code,   "year_name": year_name,
-    }
-
-    vehicles = []
-    if TRACKED_FILE.exists():
-        with open(TRACKED_FILE) as f:
-            vehicles = json.load(f)
-
-    already_tracked = any(
-        v["brand_code"] == brand_code and
-        v["model_code"] == model_code and
-        v["year_code"] == year_code
-        for v in vehicles
+    """Adiciona veículo ao rastreamento. Retorna True se adicionou, False se já existia."""
+    supabase = get_supabase()
+    existing = (
+        supabase.table("tracked_vehicles")
+        .select("id")
+        .eq("brand_code", brand_code)
+        .eq("model_code", str(model_code))
+        .eq("year_code",  year_code)
+        .execute()
     )
+    if existing.data:
+        return False
 
-    if not already_tracked:
-        vehicles.append(vehicle)
-        with open(TRACKED_FILE, "w") as f:
-            json.dump(vehicles, f, ensure_ascii=False, indent=2)
-        return True
+    supabase.table("tracked_vehicles").insert({
+        "brand_code": brand_code,
+        "brand_name": brand_name,
+        "model_code": str(model_code),
+        "model_name": model_name,
+        "year_code":  year_code,
+        "year_name":  year_name,
+    }).execute()
+    return True
 
-    return False
+
+def get_tracked_vehicles() -> list[dict]:
+    """Retorna lista de veículos rastreados do Supabase."""
+    supabase = get_supabase()
+    result = supabase.table("tracked_vehicles").select("*").execute()
+    return result.data
+
 
 def load_history(brand: str, model: str, year: str) -> pd.DataFrame:
-    if not HISTORY_FILE.exists():
+    """Carrega histórico de preços filtrado por veículo."""
+    supabase = get_supabase()
+    result = (
+        supabase.table("historico")
+        .select("*")
+        .eq("marca",  brand)
+        .eq("modelo", model)
+        .eq("ano",    year)
+        .order("data_coleta")
+        .execute()
+    )
+    if not result.data:
         return pd.DataFrame()
 
-    df = pd.read_csv(HISTORY_FILE)
-    mask = (df["marca"] == brand) & (df["modelo"] == model) & (df["ano"] == year)
-    df = df[mask].copy().sort_values("data_coleta")
-
-    if not df.empty:
-        preco_inicial = df["preco"].iloc[0]
-        df["depreciacao_pct"] = ((df["preco"] - preco_inicial) / preco_inicial * 100).round(2)
-        df["variacao_mensal"] = df["preco"].diff().round(2)
-
+    df = pd.DataFrame(result.data)
+    preco_inicial = df["preco"].iloc[0]
+    df["depreciacao_pct"] = ((df["preco"] - preco_inicial) / preco_inicial * 100).round(2)
+    df["variacao_mensal"] = df["preco"].diff().round(2)
     return df
 
-import io
 
 def to_excel(df: pd.DataFrame) -> bytes:
-    """Gera um arquivo Excel em memória e retorna os bytes para download."""
     colunas = {
         "data_coleta":    "Mês",
         "marca":          "Marca",
@@ -95,26 +110,17 @@ def to_excel(df: pd.DataFrame) -> bytes:
         "depreciacao_pct":"Depreciação Acumulada (%)",
     }
     df_export = df[[c for c in colunas if c in df.columns]].rename(columns=colunas)
-
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         df_export.to_excel(writer, index=False, sheet_name="Histórico")
-
-        # Ajusta largura das colunas automaticamente
         ws = writer.sheets["Histórico"]
         for col in ws.columns:
             max_len = max(len(str(cell.value or "")) for cell in col)
             ws.column_dimensions[col[0].column_letter].width = max_len + 4
-
     return buffer.getvalue()
 
 
 def calculate_trend(df: pd.DataFrame) -> dict | None:
-    """
-    Regressão linear sobre o histórico de preços.
-    Retorna projeção para 3 meses e recomendação de compra.
-    Requer ao menos 2 pontos de histórico.
-    """
     if len(df) < 2:
         return None
 
@@ -122,7 +128,6 @@ def calculate_trend(df: pd.DataFrame) -> dict | None:
     y = df["preco"].values
     slope, intercept = np.polyfit(x, y, 1)
 
-    # Gera os próximos 3 meses como strings "YYYY-MM"
     last = df["data_coleta"].iloc[-1]
     year, month = map(int, last.split("-"))
     future_months = []
@@ -132,27 +137,21 @@ def calculate_trend(df: pd.DataFrame) -> dict | None:
         m_adj = ((m - 1) % 12) + 1
         future_months.append(f"{y_adj}-{m_adj:02d}")
 
-    future_x = np.arange(len(df), len(df) + 3)
+    future_x     = np.arange(len(df), len(df) + 3)
     future_prices = (slope * future_x + intercept).tolist()
-
-    # Slope como % do preço atual por mês
-    slope_pct = (slope / df["preco"].iloc[-1]) * 100
+    slope_pct     = (slope / df["preco"].iloc[-1]) * 100
 
     if slope_pct < -2:
-        signal      = "queda_forte"
-        icon        = "⬇️"
+        signal = "queda_forte"; icon = "⬇️"
         recommendation = "Preço em queda acentuada — considere esperar para comprar"
     elif slope_pct < -0.5:
-        signal      = "queda_leve"
-        icon        = "📉"
+        signal = "queda_leve"; icon = "📉"
         recommendation = "Preço em leve queda — bom momento para negociar"
     elif slope_pct < 0.5:
-        signal      = "estavel"
-        icon        = "➡️"
+        signal = "estavel"; icon = "➡️"
         recommendation = "Preço estável — momento neutro para compra"
     else:
-        signal      = "alta"
-        icon        = "📈"
+        signal = "alta"; icon = "📈"
         recommendation = "Preço em alta — compre agora se quiser garantir o valor"
 
     return {

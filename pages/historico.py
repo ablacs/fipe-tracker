@@ -1,18 +1,11 @@
 import streamlit as st
-import json
-from pathlib import Path
 import fipe_api as api
 import data_processing as dp
 import charts
 
-TRACKED_FILE = Path("tracked_vehicles.json")
 
-if not TRACKED_FILE.exists():
-    st.info("Nenhum veículo cadastrado ainda. Acesse **Adicionar** para começar.")
-    st.stop()
 
-with open(TRACKED_FILE) as f:
-    vehicles = json.load(f)
+vehicles = dp.get_tracked_vehicles()
 
 if not vehicles:
     st.info("Nenhum veículo cadastrado ainda. Acesse **Adicionar** para começar.")

@@ -1,7 +1,5 @@
 import streamlit as st
 import plotly.graph_objects as go
-import json
-from pathlib import Path
 import fipe_api as api
 import data_processing as dp
 import charts
@@ -9,14 +7,9 @@ import charts
 st.set_page_config(page_title="Comparar — FIPE Tracker", page_icon="⚖️", layout="wide")
 st.title("⚖️ Comparar Veículos")
 
-TRACKED_FILE = Path("tracked_vehicles.json")
 
-if not TRACKED_FILE.exists():
-    st.info("Nenhum veículo rastreado ainda. Registre veículos em **Detalhes** primeiro.")
-    st.stop()
 
-with open(TRACKED_FILE) as f:
-    vehicles = json.load(f)
+vehicles = dp.get_tracked_vehicles()
 
 if len(vehicles) < 2:
     st.info("Você precisa de ao menos 2 veículos rastreados para comparar. Adicione mais em **Detalhes**.")
