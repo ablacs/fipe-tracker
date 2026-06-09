@@ -11,7 +11,7 @@ usando dados da Tabela FIPE.
 
 **[Ver aplicação em produção](https://ablacs-fipe-tracker.streamlit.app)**
 
-![Home](assets/screenshot_home.png)
+![Home](assets/home_prod.png)
 
 ---
 
