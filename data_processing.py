@@ -3,6 +3,8 @@ from pathlib import Path
 from datetime import datetime
 import json
 import re
+import io
+
 
 HISTORY_FILE = Path("historico.csv")
 TRACKED_FILE = Path("tracked_vehicles.json")
@@ -77,3 +79,30 @@ def load_history(brand: str, model: str, year: str) -> pd.DataFrame:
         df["variacao_mensal"] = df["preco"].diff().round(2)
 
     return df
+
+import io
+
+def to_excel(df: pd.DataFrame) -> bytes:
+    """Gera um arquivo Excel em memória e retorna os bytes para download."""
+    colunas = {
+        "data_coleta":    "Mês",
+        "marca":          "Marca",
+        "modelo":         "Modelo",
+        "ano":            "Ano/Combustível",
+        "preco":          "Preço (R$)",
+        "variacao_mensal":"Variação Mensal (R$)",
+        "depreciacao_pct":"Depreciação Acumulada (%)",
+    }
+    df_export = df[[c for c in colunas if c in df.columns]].rename(columns=colunas)
+
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        df_export.to_excel(writer, index=False, sheet_name="Histórico")
+
+        # Ajusta largura das colunas automaticamente
+        ws = writer.sheets["Histórico"]
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or "")) for cell in col)
+            ws.column_dimensions[col[0].column_letter].width = max_len + 4
+
+    return buffer.getvalue()

@@ -1,5 +1,7 @@
 import streamlit as st
 import plotly.graph_objects as go
+import json
+from pathlib import Path
 import fipe_api as api
 import data_processing as dp
 import charts
@@ -7,40 +9,31 @@ import charts
 st.set_page_config(page_title="Comparar — FIPE Tracker", page_icon="⚖️", layout="wide")
 st.title("⚖️ Comparar Veículos")
 
-brands = api.get_brands()
-brand_names = [b["nome"] for b in brands]
+TRACKED_FILE = Path("tracked_vehicles.json")
 
-# ── Sidebar: dois seletores ───────────────────────────────────────────────────
+if not TRACKED_FILE.exists():
+    st.info("Nenhum veículo rastreado ainda. Registre veículos em **Detalhes** primeiro.")
+    st.stop()
+
+with open(TRACKED_FILE) as f:
+    vehicles = json.load(f)
+
+if len(vehicles) < 2:
+    st.info("Você precisa de ao menos 2 veículos rastreados para comparar. Adicione mais em **Detalhes**.")
+    st.stop()
+
+def make_label(v):
+    return f"{v['brand_name']} {v['model_name']} ({v['year_name']})"
+
+labels = [make_label(v) for v in vehicles]
+
 with st.sidebar:
-    st.header("🚗 Veículo 1")
-    brand1_name = st.selectbox("Marca", brand_names, key="brand1")
-    brand1 = next(b for b in brands if b["nome"] == brand1_name)
+    st.header("Selecionar veículos")
+    label1 = st.selectbox("Veículo 1", labels, index=0, key="v1")
+    label2 = st.selectbox("Veículo 2", labels, index=min(1, len(labels)-1), key="v2")
 
-    models1 = api.get_models(brand1["codigo"])
-    model1_name = st.selectbox("Modelo", [m["nome"] for m in models1], key="model1")
-    model1 = next(m for m in models1 if m["nome"] == model1_name)
-
-    years1 = api.get_years(brand1["codigo"], model1["codigo"])
-    year1_name = st.selectbox("Ano/Combustível", [y["nome"] for y in years1], key="year1")
-    year1 = next(y for y in years1 if y["nome"] == year1_name)
-
-    st.divider()
-
-    st.header("🚙 Veículo 2")
-    brand2_name = st.selectbox("Marca", brand_names, key="brand2")
-    brand2 = next(b for b in brands if b["nome"] == brand2_name)
-
-    models2 = api.get_models(brand2["codigo"])
-    model2_name = st.selectbox("Modelo", [m["nome"] for m in models2], key="model2")
-    model2 = next(m for m in models2 if m["nome"] == model2_name)
-
-    years2 = api.get_years(brand2["codigo"], model2["codigo"])
-    year2_name = st.selectbox("Ano/Combustível", [y["nome"] for y in years2], key="year2")
-    year2 = next(y for y in years2 if y["nome"] == year2_name)
-
-# ── Preços atuais ─────────────────────────────────────────────────────────────
-label1 = f"{brand1_name} {model1_name} ({year1_name})"
-label2 = f"{brand2_name} {model2_name} ({year2_name})"
+v1 = vehicles[labels.index(label1)]
+v2 = vehicles[labels.index(label2)]
 
 col1, col2 = st.columns(2)
 
@@ -48,7 +41,7 @@ with col1:
     with st.container(border=True):
         st.markdown(f"**🚗 {label1}**")
         try:
-            price1 = api.get_price(brand1["codigo"], model1["codigo"], year1["codigo"])
+            price1 = api.get_price(str(v1['brand_code']), str(v1['model_code']), str(v1['year_code']))
             st.metric("Preço FIPE atual", price1["Valor"])
             st.caption(f"Referência: {price1.get('MesReferencia', '—')}")
         except Exception:
@@ -58,7 +51,7 @@ with col2:
     with st.container(border=True):
         st.markdown(f"**🚙 {label2}**")
         try:
-            price2 = api.get_price(brand2["codigo"], model2["codigo"], year2["codigo"])
+            price2 = api.get_price(str(v2['brand_code']), str(v2['model_code']), str(v2['year_code']))
             st.metric("Preço FIPE atual", price2["Valor"])
             st.caption(f"Referência: {price2.get('MesReferencia', '—')}")
         except Exception:
@@ -66,23 +59,19 @@ with col2:
 
 st.divider()
 
-# ── Gráficos comparativos ─────────────────────────────────────────────────────
-df1 = dp.load_history(brand1_name, model1_name, year1_name)
-df2 = dp.load_history(brand2_name, model2_name, year2_name)
+df1 = dp.load_history(v1['brand_name'], v1['model_name'], v1['year_name'])
+df2 = dp.load_history(v2['brand_name'], v2['model_name'], v2['year_name'])
 
-sem_historico1 = df1.empty
-sem_historico2 = df2.empty
-
-if sem_historico1 and sem_historico2:
+if df1.empty and df2.empty:
     st.info("Nenhum dos veículos tem histórico. Registre preços em **Detalhes** primeiro.")
     st.stop()
 
-if sem_historico1:
-    st.warning(f"**{label1}** ainda não tem histórico. Registre em Detalhes para incluir na comparação.")
-if sem_historico2:
-    st.warning(f"**{label2}** ainda não tem histórico. Registre em Detalhes para incluir na comparação.")
+if df1.empty:
+    st.warning(f"**{label1}** ainda não tem histórico registrado.")
+if df2.empty:
+    st.warning(f"**{label2}** ainda não tem histórico registrado.")
 
-if not sem_historico1 and not sem_historico2:
+if not df1.empty and not df2.empty:
     tab1, tab2 = st.tabs(["Depreciação comparada", "Evolução de preço"])
 
     with tab1:
@@ -106,4 +95,5 @@ if not sem_historico1 and not sem_historico2:
             xaxis_title="Mês",
             yaxis_title="Preço (R$)"
         )
+        fig.update_xaxes(type="category")
         st.plotly_chart(fig, width='stretch')

@@ -74,3 +74,13 @@ else:
             df[["data_coleta", "preco", "variacao_mensal", "depreciacao_pct"]],
             width='stretch'
         )
+        nome_arquivo = (
+            f"fipe_{selected_brand_name}_{selected_model_name}_{selected_year_name}"
+            .replace(" ", "_").replace("/", "-") + ".xlsx"
+        )
+        st.download_button(
+            label="📥 Exportar para Excel",
+            data=dp.to_excel(df),
+            file_name=nome_arquivo,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
