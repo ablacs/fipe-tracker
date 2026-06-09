@@ -1,104 +1,181 @@
-# FIPE Tracker
+---
 
-![Python](https://img.shields.io/badge/Python-3.11+-blue?logo=python)
-![Streamlit](https://img.shields.io/badge/Streamlit-1.58-red?logo=streamlit)
-![License](https://img.shields.io/badge/license-MIT-green)
-fipe-tracker/
-├── app.py # ponto de entrada do Streamlit
-├── fipe_api.py # funções de consulta à API da FIPE
-├── data_processing.py # limpeza e transformação com Pandas
-├── charts.py # funções de geração de gráficos com Plotly
-├── requirements.txt
-└── README.md
+## 🚀 Como rodar localmente
 
-Dashboard interativo de análise de depreciação de veículos usando dados históricos
-da Tabela FIPE. Permite comparar a desvalorização de diferentes modelos ao longo
-do tempo e tomar decisões mais informadas na hora de comprar ou vender um carro.
+### Pré-requisitos
+- Python 3.11+
+- Conta no [Supabase](https://supabase.com) (gratuita)
 
-## Problema que resolve
-
-A Tabela FIPE é atualizada mensalmente, mas a maioria das pessoas só consulta o
-valor atual do veículo. Este projeto coleta e armazena o histórico de preços,
-permitindo visualizar como um modelo específico deprecia com o tempo — informação
-valiosa para compradores, vendedores e entusiastas do mercado automotivo.
-
-## Funcionalidades
-
-- Busca por marca, modelo, ano e tipo de combustível
-- Gráfico de evolução do preço ao longo dos meses
-- Curva de depreciação percentual acumulada
-- Comparação lado a lado entre dois veículos
-- Indicador de "melhor momento para comprar" baseado na tendência histórica
-- Tabela com variação mensal em R$ e percentual
-
-## Stack
-
-| Camada      | Tecnologia                            |
-| ----------- | ------------------------------------- |
-| Linguagem   | Python 3.11+                          |
-| Dashboard   | Streamlit                             |
-| Gráficos    | Plotly Express                        |
-| Dados       | Pandas                                |
-| HTTP        | Requests                              |
-| API externa | FIPE API (gratuita, sem autenticação) |
-
-## Como rodar localmente
+### 1. Clone o repositório
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/fipe-tracker.git
+git clone https://github.com/ablacs/fipe-tracker.git
 cd fipe-tracker
+```
 
-# 2. Crie e ative o ambiente virtual
-python -m venv venv
+### 2. Crie e ative o ambiente virtual
+
+```bash
+python3 -m venv venv
 source venv/bin/activate
+```
 
-# 3. Instale as dependências
-pip install streamlit pandas plotly requests
+### 3. Instale as dependências
 
-# 4. Rode o app
+```bash
+pip install -r requirements.txt
+# Para desenvolvimento (testes):
+pip install -r requirements-dev.txt
+```
+
+### 4. Configure as variáveis de ambiente
+
+Crie um arquivo `.env` na raiz do projeto:
+
+```env
+SUPABASE_URL=https://seu-projeto.supabase.co
+SUPABASE_KEY=sua_anon_key
+```
+
+> As credenciais estão em **Supabase → Project Settings → API Keys**.
+
+### 5. Crie as tabelas no Supabase
+
+No **SQL Editor** do Supabase, execute:
+
+```sql
+CREATE TABLE tracked_vehicles (
+    id SERIAL PRIMARY KEY,
+    brand_code TEXT NOT NULL,
+    brand_name TEXT NOT NULL,
+    model_code TEXT NOT NULL,
+    model_name TEXT NOT NULL,
+    year_code  TEXT NOT NULL,
+    year_name  TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (brand_code, model_code, year_code)
+);
+
+CREATE TABLE historico (
+    id SERIAL PRIMARY KEY,
+    data_coleta TEXT NOT NULL,
+    marca       TEXT NOT NULL,
+    modelo      TEXT NOT NULL,
+    ano         TEXT NOT NULL,
+    preco       NUMERIC NOT NULL,
+    created_at  TIMESTAMP DEFAULT NOW(),
+    UNIQUE (data_coleta, marca, modelo, ano)
+);
+```
+
+### 6. Rode o app
+
+```bash
 streamlit run app.py
 ```
 
 Acesse em: http://localhost:8501
 
-## Estrutura do projeto
+---
 
-## API utilizada
+## 🐳 Como rodar com Docker
 
-Base URL: `https://parallelum.com.br/fipe/api/v1`
+```bash
+# Sobe o container (lê as variáveis do .env automaticamente)
+docker compose up --build
 
-Endpoints relevantes:
+# Em background
+docker compose up -d
 
-- `GET /carros/marcas` — lista todas as marcas
-- `GET /carros/marcas/{codMarca}/modelos` — modelos de uma marca
-- `GET /carros/marcas/{codMarca}/modelos/{codModelo}/anos` — anos disponíveis
-- `GET /carros/marcas/{codMarca}/modelos/{codModelo}/anos/{ano}` — preço atual
+# Para o container
+docker compose down
+```
 
-> A API não retorna histórico diretamente. A estratégia é agendar coletas mensais
-> e armazenar os resultados em um CSV local ou no Supabase para construir o
-> histórico ao longo do tempo.
+---
 
-## Deploy (gratuito)
+## ⚙️ Variáveis de ambiente
 
-1. Suba o projeto no GitHub
-2. Acesse [share.streamlit.io](https://share.streamlit.io)
-3. Conecte sua conta GitHub e selecione o repositório
-4. Aponte para `app.py` como arquivo principal
-5. Clique em Deploy — o link público é gerado automaticamente
+| Variável       | Descrição                      | Onde configurar                                   |
+| -------------- | ------------------------------ | ------------------------------------------------- |
+| `SUPABASE_URL` | URL do projeto Supabase        | `.env` local / Streamlit Secrets / GitHub Secrets |
+| `SUPABASE_KEY` | Chave anon pública do Supabase | `.env` local / Streamlit Secrets / GitHub Secrets |
 
-Nenhuma variável de ambiente necessária.
+---
 
-## Variáveis de ambiente
+## 🔌 API utilizada
 
-Nenhuma. A API da FIPE é pública e não requer autenticação.
+**Base URL:** `https://parallelum.com.br/fipe/api/v1`
 
-## Notas de implementação
+| Endpoint                                            | Descrição             |
+| --------------------------------------------------- | --------------------- |
+| `GET /carros/marcas`                                | Lista todas as marcas |
+| `GET /carros/marcas/{cod}/modelos`                  | Modelos de uma marca  |
+| `GET /carros/marcas/{cod}/modelos/{cod}/anos`       | Anos disponíveis      |
+| `GET /carros/marcas/{cod}/modelos/{cod}/anos/{ano}` | Preço atual           |
 
-- A API FIPE retorna preços apenas do mês atual. Para ter histórico, você precisa
-  rodar uma coleta periódica. Use um GitHub Actions com schedule mensal para
-  coletar e commitar um CSV atualizado no próprio repositório.
-- O código do veículo muda entre anos (ex: "Golf 2020" e "Golf 2021" têm códigos
-  diferentes). Armazene a combinação marca+modelo+ano para evitar bugs no histórico.
-- Comece com apenas carros (`/carros`). A API também tem motos (`/motos`) e
-  caminhões (`/caminhoes`) — adicione como feature extra depois.
+> A API retorna apenas o preço do mês corrente. O histórico é construído através
+> de coletas mensais automáticas armazenadas no Supabase.
+
+---
+
+## ⚡ GitHub Actions — Coleta automática
+
+Todo dia 1 de cada mês às 9h UTC, uma GitHub Action executa `scripts/collect_prices.py`,
+que busca o preço atualizado de cada veículo rastreado no Supabase e salva o novo registro.
+
+Para configurar, adicione `SUPABASE_URL` e `SUPABASE_KEY` em:
+**GitHub → Settings → Secrets and variables → Actions**
+
+Para rodar manualmente:
+**GitHub → Actions → Coleta Mensal de Preços FIPE → Run workflow**
+
+---
+
+## 🧪 Testes
+
+```bash
+# Roda todos os testes
+pytest tests/ -v
+
+# Com cobertura
+pytest tests/ -v --cov=data_processing
+```
+
+Os testes cobrem as funções de processamento de dados com mocks do Supabase,
+sem necessidade de conexão com o banco em ambiente de testes.
+
+---
+
+## 📦 Deploy no Streamlit Cloud
+
+1. Acesse [share.streamlit.io](https://share.streamlit.io) e conecte sua conta GitHub
+2. Selecione o repositório `fipe-tracker` e o branch `main`
+3. Aponte para `app.py` como arquivo principal
+4. Em **Advanced settings**, adicione as variáveis de ambiente:
+
+```toml
+   SUPABASE_URL = "https://seu-projeto.supabase.co"
+   SUPABASE_KEY = "sua_anon_key"
+```
+
+5. Clique em **Deploy**
+
+---
+
+## ⚠️ Limitações conhecidas e próximos passos
+
+O app atual usa um **banco de dados compartilhado** — todos os usuários veem e
+contribuem com os mesmos dados. Para uma versão multi-usuário completa, os próximos
+passos seriam:
+
+- [ ] Autenticação com **Supabase Auth**
+- [ ] **Row Level Security (RLS)** para isolamento de dados por usuário
+- [ ] Suporte a **motos e caminhões** (a API FIPE já disponibiliza esses endpoints)
+- [ ] **Alertas de preço** por e-mail quando um veículo atingir um valor alvo
+- [ ] Melhoria da análise de tendência com modelos mais sofisticados
+
+---
+
+## 📄 Licença
+
+MIT — veja o arquivo [LICENSE](LICENSE) para detalhes.
