@@ -5,6 +5,7 @@
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?logo=supabase)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED?logo=docker)
 ![Tests](https://github.com/ablacs/fipe-tracker/actions/workflows/collect_prices.yml/badge.svg)
+![CI](https://github.com/ablacs/fipe-tracker/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
 Dashboard interativo para acompanhar a depreciação histórica de veículos brasileiros
