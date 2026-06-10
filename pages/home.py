@@ -1,7 +1,8 @@
-import streamlit as st
 import plotly.graph_objects as go
-import fipe_api as api
+import streamlit as st
+
 import data_processing as dp
+import fipe_api as api
 
 st.title("📉 FIPE Tracker")
 st.caption("Acompanhamento histórico de depreciação — Tabela FIPE")

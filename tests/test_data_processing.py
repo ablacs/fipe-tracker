@@ -1,12 +1,17 @@
-import pytest
-import pandas as pd
 from unittest.mock import MagicMock, patch
+
+import pandas as pd
+
 import data_processing as dp
 from constants import (
-    COL_ANO, TABLE_HISTORICO, TABLE_TRACKED,
-    COL_MARCA, COL_MODELO, COL_PRECO, COL_DATA_COLETA,
+    COL_ANO,
+    COL_DATA_COLETA,
+    COL_MARCA,
+    COL_MODELO,
+    COL_PRECO,
+    TABLE_HISTORICO,
+    TABLE_TRACKED,
 )
-
 
 # ── parse_price ───────────────────────────────────────────────────────────────
 

@@ -1,18 +1,27 @@
-import pandas as pd
-from datetime import datetime
-import re
 import io
 import os
+import re
+from datetime import datetime
+
 import numpy as np
+import pandas as pd
 from dotenv import load_dotenv
-from supabase import create_client, Client
+from supabase import Client, create_client
 
 from constants import (
-    TABLE_HISTORICO, TABLE_TRACKED,
-    COL_BRAND_CODE, COL_BRAND_NAME,
-    COL_MODEL_CODE, COL_MODEL_NAME,
-    COL_YEAR_CODE,  COL_YEAR_NAME,
-    COL_DATA_COLETA, COL_MARCA, COL_MODELO, COL_ANO, COL_PRECO,
+    COL_ANO,
+    COL_BRAND_CODE,
+    COL_BRAND_NAME,
+    COL_DATA_COLETA,
+    COL_MARCA,
+    COL_MODEL_CODE,
+    COL_MODEL_NAME,
+    COL_MODELO,
+    COL_PRECO,
+    COL_YEAR_CODE,
+    COL_YEAR_NAME,
+    TABLE_HISTORICO,
+    TABLE_TRACKED,
 )
 
 load_dotenv()
@@ -160,16 +169,16 @@ def calculate_trend(df: pd.DataFrame) -> dict | None:
     slope_pct     = (slope / df[COL_PRECO].iloc[-1]) * 100
 
     if slope_pct < TREND_STRONG_DROP:
-        signal = "queda_forte"; icon = "⬇️"
+        signal = "queda_forte"
         recommendation = "Preço em queda acentuada — considere esperar para comprar"
     elif slope_pct < TREND_MILD_DROP:
-        signal = "queda_leve"; icon = "📉"
+        signal = "queda_leve"
         recommendation = "Preço em leve queda — bom momento para negociar"
     elif slope_pct < TREND_MILD_RISE:
-        signal = "estavel"; icon = "➡️"
+        signal = "estavel"
         recommendation = "Preço estável — momento neutro para compra"
     else:
-        signal = "alta"; icon = "📈"
+        signal = "alta"
         recommendation = "Preço em alta — compre agora se quiser garantir o valor"
 
     return {
@@ -177,6 +186,5 @@ def calculate_trend(df: pd.DataFrame) -> dict | None:
         "future_months": future_months,
         "future_prices": [round(p, 2) for p in future_prices],
         "signal":        signal,
-        "icon":          icon,
         "recommendation": recommendation,
     }

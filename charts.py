@@ -1,6 +1,7 @@
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
+
 
 def price_evolution_chart(df: pd.DataFrame, title: str) -> go.Figure:
     fig = px.line(

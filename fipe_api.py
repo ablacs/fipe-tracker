@@ -1,5 +1,6 @@
 import requests
 import streamlit as st
+
 BASE_URL = "https://parallelum.com.br/fipe/api/v1/carros"
 
 @st.cache_data(ttl=86400)

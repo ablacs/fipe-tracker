@@ -1,8 +1,9 @@
-import streamlit as st
 import plotly.graph_objects as go
-import fipe_api as api
-import data_processing as dp
+import streamlit as st
+
 import charts
+import data_processing as dp
+import fipe_api as api
 
 st.set_page_config(page_title="Comparar — FIPE Tracker", page_icon="⚖️", layout="wide")
 st.title("⚖️ Comparar Veículos")

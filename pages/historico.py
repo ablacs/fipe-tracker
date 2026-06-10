@@ -1,9 +1,8 @@
 import streamlit as st
-import fipe_api as api
-import data_processing as dp
+
 import charts
-
-
+import data_processing as dp
+import fipe_api as api
 
 vehicles = dp.get_tracked_vehicles()
 
@@ -11,7 +10,7 @@ if not vehicles:
     st.info("Nenhum veículo cadastrado ainda. Acesse **Adicionar** para começar.")
     st.stop()
 
-def make_label(v):
+def make_label(v: dict) -> str:
     return f"{v['brand_name']} {v['model_name']} ({v['year_name']})"
 
 labels = [make_label(v) for v in vehicles]

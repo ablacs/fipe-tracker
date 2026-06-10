@@ -1,6 +1,7 @@
 import streamlit as st
-import fipe_api as api
+
 import data_processing as dp
+import fipe_api as api
 
 st.title("➕ Adicionar Veículo")
 st.caption("Busque um veículo na Tabela FIPE e adicione ao rastreamento.")
