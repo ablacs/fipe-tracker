@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
+import pytest
 
 import data_processing as dp
 from constants import (
@@ -103,10 +104,11 @@ class TestCalculateTrend:
             {COL_DATA_COLETA: "2026-06", COL_PRECO: 49000.0},
         ])
         result = dp.calculate_trend(df)
-        assert all(k in result for k in [
-            "slope_pct", "future_months", "future_prices",
-            "signal", "icon", "recommendation"
-        ])
+        assert result is not None
+        campos_esperados = {"slope_pct", "future_months", "future_prices",
+                            "signal", "recommendation"}
+        assert campos_esperados == set(result.keys()), \
+            f"Chaves retornadas: {set(result.keys())}"
 
 
 # ── save_price ────────────────────────────────────────────────────────────────
@@ -253,3 +255,11 @@ class TestToExcel:
         result = dp.to_excel(df)
         # Arquivos XLSX começam com a assinatura PK (ZIP)
         assert result[:2] == b"PK"
+
+# em test_data_processing.py
+class TestGetSupabase:
+    def test_levanta_erro_sem_variaveis(self, monkeypatch):
+        monkeypatch.delenv("SUPABASE_URL", raising=False)
+        monkeypatch.delenv("SUPABASE_KEY", raising=False)
+        with pytest.raises(ValueError, match="SUPABASE_URL"):
+            dp.get_supabase()
